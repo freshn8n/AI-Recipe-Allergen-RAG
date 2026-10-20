@@ -1,136 +1,109 @@
-# AI-Recipe-Allergen-RAG
+# AI Recipe Allergen RAG
 
 ![Workflow overview: Google Drive to Supabase ingestion pipeline and Telegram AI agent](rag-workflow-thumbnail-v2.png)
 
-An AI-powered assistant that retrieves live recipe data to accurately answer allergen questions and look up dishes in real time — built entirely in n8n with no custom code.
+An AI assistant that answers allergen and ingredient questions from a restaurant's own recipe documents, delivered through Telegram. Built entirely in n8n with no custom code.
 
-📌 Overview
+> **Status:** Working prototype, built and tested on sample recipe documents. Not yet deployed in a live kitchen.
 
-This project solves a real problem in food service: staff and customers need fast, accurate answers about ingredients and allergens — and traditional lookup methods are slow, inconsistent, and error-prone.
-This system uses Retrieval-Augmented Generation (RAG) to:
-	∙	Embed recipe documents into a vector database
-	∙	Retrieve the most relevant recipe data when a question is asked
-	∙	Pass that context to an LLM to generate an accurate, grounded response
-	∙	Return the answer instantly via Telegram
-Because the AI is grounded in real retrieved data — not just its training — it doesn’t hallucinate ingredients or guess at allergens.
+<!-- Demo video goes here -->
 
-🏗️ Architecture
+## The problem
 
-This system is built as two separate n8n workflows — one for ingestion, one for querying. This is the correct production approach: data is embedded once and stored, then retrieved instantly on every query.
-Workflow 1 — Document Ingestion Pipeline
-Processes recipe documents from Google Drive and loads them into the vector database.
-Trigger (Manual / Scheduled)
-    ↓
-Find Parent Folder (Google Drive)
-    ↓
-List Subfolders
-    ↓
-Loop Folders
-    ↓
-List Files Inside Current Folder
-    ↓
-Loop Files
-    ↓
-Edit Fields (normalize metadata)
-    ↓
-Download File
-    ↓
-Embeddings OpenAI (convert to vectors)
-    ↓
-Supabase Vector Store (store embeddings + content)
-    ↓
-Default Data Loader
-Workflow 2 — AI Agent Query Pipeline
-Handles live user queries via Telegram and returns grounded, accurate responses.
+In food service, staff and guests need fast, accurate answers about ingredients and allergens. Looking it up by hand during a busy service is slow, and answers vary depending on who you ask. I spent 10+ years in kitchens, and this is a question that comes up every shift.
+
+## How it works
+
+The system uses Retrieval-Augmented Generation (RAG):
+
+- Recipe documents are converted into embeddings and stored in a vector database
+- When someone asks a question, the most relevant recipes are retrieved
+- That recipe text is passed to the LLM, which answers using only what was retrieved
+- The answer goes back to the user in Telegram
+
+Because answers come from the actual recipe documents instead of the model's general knowledge, the assistant stays grounded in your menu and can say when a dish isn't in its data.
+
+## Architecture
+
+Two separate n8n workflows: one loads the data, one answers questions. Recipes are embedded once and stored, so each question is a fast lookup.
+
+### Workflow 1: Document ingestion
+
+```
+Trigger (manual or scheduled)
+  → Find parent folder (Google Drive)
+  → List subfolders → loop folders
+  → List files → loop files
+  → Normalize metadata
+  → Download file
+  → OpenAI Embeddings
+  → Supabase Vector Store (embeddings + text)
+```
+
+### Workflow 2: Question answering
+
+```
 Telegram Trigger (incoming message)
-    ↓
-AI Agent
-    ├── OpenAI Chat Model (LLM)
-    ├── Simple Memory (conversation context)
-    └── Answer Questions with Vector Store (RAG tool)
-            ↓
-        Supabase Vector Store
-            ↓
-        Embeddings OpenAI (embed the query)
-            ↓
-        OpenAI Chat Model (generate grounded response)
-    ↓
-Send Text Message (Telegram — response to user)
+  → AI Agent
+      ├─ OpenAI Chat Model
+      ├─ Simple Memory (conversation context)
+      └─ Vector Store tool → Supabase → OpenAI Embeddings
+  → Send Telegram reply
+```
 
-🛠️ Tech Stack
+Simple Memory lets people ask follow-ups naturally: "Does the salmon have dairy?" then "What about gluten?" The agent knows which dish is still being discussed.
 
-Component             Tool
-Orchestraion.         n8n
-LLM.                  Open AI (GPT-                                4/compatible API
-Embeddings.           Open AI Embeddings API
-Vector Database.      Supabase (pgvector)
-Data Source.          Google Drive (recipe                         documents)
-User Interface.       Telegram Bot API
-Logging (Optional).   Notion/Google Sheets
+## Tech stack
 
-⚙️ How It Works
+| Component | Tool |
+|---|---|
+| Orchestration | n8n |
+| LLM | OpenAI chat model |
+| Embeddings | OpenAI Embeddings API |
+| Vector database | Supabase (pgvector) |
+| Data source | Google Drive (recipe documents) |
+| Interface | Telegram Bot API |
 
-Workflow 1 — Ingestion (Run Once Per Update)
-	1.	n8n locates the parent folder in Google Drive and recursively lists all subfolders and files
-	2.	Each recipe file is downloaded and passed through OpenAI Embeddings to generate a vector representation
-	3.	The vector and original text are stored together in Supabase, making the data semantically searchable
-Workflow 2 — Query (Every User Request)
-	1.	A user sends a message via Telegram (e.g. “Does the Caesar salad contain dairy?”)
-	2.	The Telegram Trigger fires and passes the message to the AI Agent node
-	3.	The AI Agent uses three tools simultaneously:
-	∙	OpenAI Chat Model — the core LLM for generating responses
-	∙	Simple Memory — retains conversation context for follow-up questions
-	∙	Answer Questions with Vector Store — searches Supabase for the most relevant recipe data, using OpenAI Embeddings to match the query semantically
-	4.	The retrieved recipe context is passed to the LLM, which generates a grounded, accurate answer
-	5.	The response is sent back to the user via Telegram
-	
-💡 Simple Memory means the agent remembers the conversation — users can ask follow-up questions naturally without repeating themselves. For example: “Does it have dairy?” → “What about gluten?” — the agent knows what dish is still being discussed.
+## Example questions
 
-💡 Why RAG Instead of Just ChatGPT?
-A standard LLM (like ChatGPT) would try to answer allergen questions from its training data — which knows nothing about your specific recipes. It would guess, hallucinate ingredients, or give generic answers.
-RAG fixes this by grounding every answer in your actual recipe data. The AI can only answer from what’s in your database — making it accurate, auditable, and safe for allergen use cases.
+| Question | What the system does |
+|---|---|
+| Does the salmon dish contain gluten? | Retrieves the salmon recipe and checks its ingredients |
+| What are the vegan options? | Searches all recipes and lists the dishes that fit |
+| What's in the house vinaigrette? | Returns the full ingredient list for the vinaigrette |
+| Is there shellfish in the seafood pasta? | Retrieves the pasta recipe and confirms or denies shellfish |
 
-📋 Example Queries.
+## Why RAG instead of a general chatbot?
 
-User Question.               System Behavior
-Does the salmon dish
-contain gluten?              Retrieves                                   salmon                                      recipe,                                     checks                                      ingreidents,                                answer                                      accurately.      
-What are the vegan options?  Searches all                                recipes,                                    filters by                                  vegan tags
-                             /ingredients, 
-                             list options. 
-What's in the house 
-vinaigrette?                 Retrives                                    vinaigrette                                 recipe, return                              full ingred
-                             ients list.
-Is there shell fish in the 
-seafood pasta?               Retrives pasta                              recipe,                                     confirms or                                 denies                                      shellfish                                   presence.
+A general chatbot doesn't know your recipes. Asked about allergens, it will guess based on what the dish usually contains. RAG limits the answer to what's in your recipe documents, which makes answers specific to your menu and easier to audit.
 
-🔒 Workflow & Implementation
+## Safety note
 
-The internal n8n workflow, prompt structure, and configuration files for this project are proprietary and not publicly available.
-This repository documents the architecture, design decisions, and outcomes for portfolio purposes only.
-If you’re interested in a similar system for your business, feel free to reach out directly.
+This is a lookup tool, not a replacement for kitchen verification. Answers are only as accurate as the recipe documents behind them, and recipes, substitutions, and cross-contact risks change. For severe allergies, always confirm with the kitchen.
 
-📈 Results & Impact
+## Results so far
 
-	∙	Eliminated manual recipe lookups during service
-	∙	Reduced allergen query response time from minutes to seconds
-	∙	Grounded AI responses in real data — no hallucinations
-	∙	Scalable: adding new recipes only requires uploading to Google Drive
+- Two-workflow pipeline built and running end to end in n8n
+- Tested on sample recipe documents
+- Adding recipes only requires uploading files to Google Drive and re-running ingestion
 
-🗺️ Roadmap
+## Roadmap
 
-	∙	Multi-restaurant support (separate knowledge bases per location)
-	∙	Web chat interface (in addition to Telegram)
-	∙	Automatic re-ingestion when Google Drive documents are updated
-	∙	Allergen tagging system for faster filtering
-	∙	Admin dashboard for query logging and review
+- Automatic re-ingestion when Drive documents change
+- Allergen tags for faster filtering
+- Web chat interface in addition to Telegram
+- Separate knowledge bases per location
+- Query logging for review
 
-	👤 Author
-	
-Blair Jones — IT & Automation Builder
-📩 blairjmail@gmail.com
-🔗 LinkedIn | GitHub
+## Workflow and implementation
 
-📄 License
+The n8n workflows, prompts, and configuration are not public. This repository documents the architecture and design for portfolio purposes. If you want a similar system for your business, reach out.
 
-© Blair Jones. All rights reserved. This project is shared for portfolio and educational purposes only. The workflow, configuration, and implementation are proprietary and may not be reproduced, distributed, or used commercially without explicit written permission.
+## Author
+
+**Blair "Fresh" Jones**, AI automation builder, Nashville, TN
+[LinkedIn](https://www.linkedin.com/in/blair-jones-43906112b) · [GitHub](https://github.com/freshn8n) · blairjmail@gmail.com
+
+## License
+
+© Blair Jones. All rights reserved. Shared for portfolio and educational purposes only. The workflow, configuration, and implementation may not be reproduced, distributed, or used commercially without written permission.
