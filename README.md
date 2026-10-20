@@ -1,4 +1,7 @@
 # AI-Recipe-Allergen-RAG
+
+![Workflow overview: Google Drive to Supabase ingestion pipeline and Telegram AI agent](rag-workflow-thumbnail-v2.png)
+
 An AI-powered assistant that retrieves live recipe data to accurately answer allergen questions and look up dishes in real time — built entirely in n8n with no custom code.
 
 📌 Overview
