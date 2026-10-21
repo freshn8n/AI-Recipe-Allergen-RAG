@@ -1,10 +1,12 @@
 # AI Recipe Allergen RAG
 
-![Workflow overview: Google Drive to Supabase ingestion pipeline and Telegram AI agent](rag-workflow-thumbnail-v2.png)
+![Workflow overview: Google Drive to Supabase ingestion pipeline and AI agent](rag-workflow-thumbnail-v2.png)
 
-An AI assistant that answers allergen and ingredient questions from a restaurant's own recipe documents, delivered through Telegram. Built entirely in n8n with no custom code.
+An AI assistant that answers allergen and ingredient questions from a restaurant's own recipe documents, through a web page or Telegram. Built in n8n.
 
-> **Status:** Working prototype, built and tested on sample recipe documents. Not yet deployed in a live kitchen.
+**Live demo:** [allergen-assistant-nukleix.vercel.app](https://allergen-assistant-nukleix.vercel.app), running on a sample menu for a fusion arancini food truck concept (Around The World Arancini).
+
+> **Status:** Working prototype, built and tested on 16 sample recipe cards I wrote for the demo. Not yet deployed in a live kitchen.
 
 <!-- Demo video goes here -->
 
@@ -19,13 +21,13 @@ The system uses Retrieval-Augmented Generation (RAG):
 - Recipe documents are converted into embeddings and stored in a vector database
 - When someone asks a question, the most relevant recipes are retrieved
 - That recipe text is passed to the LLM, which answers using only what was retrieved
-- The answer goes back to the user in Telegram
+- The answer goes back to the guest on the web page (or in Telegram)
 
 Because answers come from the actual recipe documents instead of the model's general knowledge, the assistant stays grounded in your menu and can say when a dish isn't in its data.
 
 ## Architecture
 
-Two separate n8n workflows: one loads the data, one answers questions. Recipes are embedded once and stored, so each question is a fast lookup.
+Separate n8n workflows: one loads the data, and the question-answering agent is exposed two ways (a web page and Telegram). Recipes are embedded once and stored, so each question is a fast lookup.
 
 ### Workflow 1: Document ingestion
 
@@ -40,7 +42,19 @@ Trigger (manual or scheduled)
   → Supabase Vector Store (embeddings + text)
 ```
 
-### Workflow 2: Question answering
+### Workflow 2: Question answering (web)
+
+```
+Web page (allergen chips + chat)
+  → n8n Webhook (POST: question + session ID)
+  → AI Agent
+      ├─ OpenAI Chat Model
+      ├─ Simple Memory (keyed to the browser session)
+      └─ Vector Store tool → Supabase → OpenAI Embeddings
+  → Respond to Webhook (JSON reply)
+```
+
+### Workflow 3: Question answering (Telegram)
 
 ```
 Telegram Trigger (incoming message)
@@ -51,7 +65,7 @@ Telegram Trigger (incoming message)
   → Send Telegram reply
 ```
 
-Simple Memory lets people ask follow-ups naturally: "Does the salmon have dairy?" then "What about gluten?" The agent knows which dish is still being discussed.
+Simple Memory lets people ask follow-ups naturally: "Does the French Onion Arancini have dairy?" then "What about gluten?" The agent knows which dish is still being discussed.
 
 ## Tech stack
 
@@ -62,16 +76,17 @@ Simple Memory lets people ask follow-ups naturally: "Does the salmon have dairy?
 | Embeddings | OpenAI Embeddings API |
 | Vector database | Supabase (pgvector) |
 | Data source | Google Drive (recipe documents) |
-| Interface | Telegram Bot API |
+| Interface | Static web page (Vercel) + Telegram Bot API |
 
 ## Example questions
 
 | Question | What the system does |
 |---|---|
-| Does the salmon dish contain gluten? | Retrieves the salmon recipe and checks its ingredients |
-| What are the vegan options? | Searches all recipes and lists the dishes that fit |
-| What's in the house vinaigrette? | Returns the full ingredient list for the vinaigrette |
-| Is there shellfish in the seafood pasta? | Retrieves the pasta recipe and confirms or denies shellfish |
+| Are there nuts in the salad? | Finds the Caribbean Mango Salad and flags the cashews (tree nuts) |
+| What can I eat without shellfish? | Lists every shellfish-free item from the menu allergen overview |
+| Is the Kimchi Corn Arancini safe for a sesame allergy? | Notes the arancini has no sesame but its default glaze does |
+| What's in the remoulade? | Returns the full ingredient list and allergens |
+| Do you have a smash burger? | Says the dish isn't in the recipes and suggests asking the kitchen |
 
 ## Why RAG instead of a general chatbot?
 
@@ -83,15 +98,16 @@ This is a lookup tool, not a replacement for kitchen verification. Answers are o
 
 ## Results so far
 
-- Two-workflow pipeline built and running end to end in n8n
-- Tested on sample recipe documents
-- Adding recipes only requires uploading files to Google Drive and re-running ingestion
+- Pipeline running end to end in n8n, with a public web demo
+- Tested on sample recipes: single-dish lookups, "what can I eat without X" lists, follow-up questions, and dishes not on the menu
+- Testing caught a real failure: list questions only saw a few recipes and once listed a shellfish dish as shellfish-free. Fixed by adding a menu-wide allergen overview document and retrieving more results, then retested
+- New recipes can be added by uploading files to Google Drive and re-running ingestion (the demo menu was loaded with a one-off n8n loader workflow)
 
 ## Roadmap
 
 - Automatic re-ingestion when Drive documents change
-- Allergen tags for faster filtering
-- Web chat interface in addition to Telegram
+- Structured allergen table for exact filtering
+- Back-of-house prep view: look up recipes and scale batches
 - Separate knowledge bases per location
 - Query logging for review
 
