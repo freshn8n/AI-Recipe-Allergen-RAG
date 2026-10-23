@@ -8,7 +8,9 @@ An AI assistant that helps servers answer guest allergen and ingredient question
 
 > **Status:** Working prototype, built and tested on 16 sample recipe cards I wrote for the demo. Not yet deployed in a live kitchen.
 
-<!-- Demo video goes here -->
+https://github.com/user-attachments/assets/30509548-0b06-4afe-9b2f-9a7f7a924930
+
+
 
 ## The problem
 
