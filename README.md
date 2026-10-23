@@ -2,7 +2,7 @@
 
 ![Workflow overview: Google Drive to Supabase ingestion pipeline and AI agent](rag-workflow-thumbnail-v2.png)
 
-An AI assistant that answers allergen and ingredient questions from a restaurant's own recipe documents, through a web page or Telegram. Built in n8n.
+An AI assistant that helps servers answer guest allergen and ingredient questions from the restaurant's own recipe documents, without walking back to the kitchen for every question. Works on a phone or tablet (web page) or in Telegram. Built in n8n.
 
 **Live demo:** [allergen-assistant-nukleix.vercel.app](https://allergen-assistant-nukleix.vercel.app), running on a sample menu for a fusion arancini food truck concept (Around The World Arancini).
 
@@ -21,7 +21,7 @@ The system uses Retrieval-Augmented Generation (RAG):
 - Recipe documents are converted into embeddings and stored in a vector database
 - When someone asks a question, the most relevant recipes are retrieved
 - That recipe text is passed to the LLM, which answers using only what was retrieved
-- The answer goes back to the guest on the web page (or in Telegram)
+- The answer goes back to the server on the web page (or in Telegram)
 
 Because answers come from the actual recipe documents instead of the model's general knowledge, the assistant stays grounded in your menu and can say when a dish isn't in its data.
 
@@ -45,7 +45,7 @@ Trigger (manual or scheduled)
 ### Workflow 2: Question answering (web)
 
 ```
-Web page (allergen chips + chat)
+Web page for servers (allergen chips + chat)
   → n8n Webhook (POST: question + session ID)
   → AI Agent
       ├─ OpenAI Chat Model
